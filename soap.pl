@@ -143,4 +143,10 @@ print "*******\n";
 print decode_base64($response->{'txt'});
 print "******\n";
 
+print "**Guardar PNG**\n";
+my $out;
+open($out, '>:raw', 'comprobantes/imagen.png') or die "Unable to open: $!";
+print $out decode_base64($response->{'png'});
+close($out);
+
 print "Fin de ejecucion"
