@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 # declare usage of SOAP::Lite
-use SOAP::Lite( +trace => 'all', maptype => {} );
+use SOAP::Lite;#( +trace => 'all', maptype => {} );
 use POSIX qw(strftime);
 use MIME::Base64;
 use Data::Dumper;
@@ -10,6 +10,36 @@ use Class::Struct;
 # Generar CFDI
 my $now = time();
 $fecha_actual = strftime("%Y-%m-%dT%H:%M:%S", localtime($now));
+# specifying this subroutine, causes basic auth to use
+# its credentials when challenged
+$numero_certificado = "20001000000200000192";
+$archivo_cer = "utilerias/certificados/20001000000200000192.cer";
+$archivo_pem = "utilerias/certificados/20001000000200000192.key.pem";
+
+my $rfc = "ESI920427886";
+my $url_timbrado = "https://t1demo.facturacionmoderna.com/timbrado/wsdl";
+my $user_id = "UsuarioPruebasWS";
+my $user_password = "b9ec2afa3361a59af4b4d102d3f704eabdf097d4";
+
+
+$xml = <<XML;
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xsi:schemaLocation="http://www.sat.gob.mx/cfd/3 http://www.sat.gob.mx/sitio_internet/cfd/3/cfdv32.xsd" xmlns:cfdi="http://www.sat.gob.mx/cfd/3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="3.2" fecha="$fecha_actual" tipoDeComprobante="ingreso" noCertificado="" certificado="" sello="" formaDePago="Pago en una sola exhibición" metodoDePago="Transferencia Electrónica" NumCtaPago="No identificado" LugarExpedicion="San Pedro Garza García, Mty." subTotal="10.00" total="11.60">
+<cfdi:Emisor nombre="EMPRESA DEMO" rfc="$rfc">
+  <cfdi:RegimenFiscal Regimen="No aplica"/>
+</cfdi:Emisor>
+<cfdi:Receptor nombre="PUBLICO EN GENERAL" rfc="XAXX010101000"></cfdi:Receptor>
+<cfdi:Conceptos>
+   <cfdi:Concepto cantidad="10" unidad="No aplica" noIdentificacion="00001" descripcion="Servicio de Timbrado" valorUnitario="1.00" importe="10.00">
+    </cfdi:Concepto>
+</cfdi:Conceptos>
+<cfdi:Impuestos totalImpuestosTrasladados="1.60">
+  <cfdi:Traslados>
+    <cfdi:Traslado impuesto="IVA" tasa="16.00" importe="1.6"></cfdi:Traslado>
+  </cfdi:Traslados>
+</cfdi:Impuestos>
+</cfdi:Comprobante>
+XML
 $cfdi = <<LAYOUT;
 [Encabezado]
 
@@ -35,7 +65,7 @@ observaciones|
 
 [Emisor]
 
-rfc|ESI920427886
+rfc|$rfc
 nombre|EMPRESA DE MUESTRA S.A de C.V.
 RegimenFiscal|REGIMEN GENERAL DE LEY
 
@@ -101,14 +131,7 @@ tasa|16.00
 LAYOUT
 
 
-# specifying this subroutine, causes basic auth to use
-# its credentials when challenged
-my $rfc = "ESI920427886";
-my $url_timbrado = "https://t1demo.facturacionmoderna.com/timbrado/wsdl";
-my $user_id = "UsuarioPruebasWS";
-my $user_password = "b9ec2afa3361a59af4b4d102d3f704eabdf097d4";
-
-$encoded = encode_base64($cfdi);
+$encoded = encode_base64($xml);
 # declare the SOAP endpoint here
 my $soap = SOAP::Lite->service($url_timbrado);
 
@@ -128,25 +151,39 @@ my @params = { emisorRFC => $rfc,
   generarTXT => 'true',
   generarPDF => 'false'};
 
-my $response = $soap->requestTimbrarCFDI(@params);
+our $error = 0;
+sub ErrorHappen {
+  $error = 1;
+}
+our $response;
+eval {
+  $response = $soap->requestTimbrarCFDI(@params);
+} || ErrorHappen;
+
+unless ($error) {
+  print "**********\n";
+  print Dumper($response);
+  print "**********\n";
+
+  print "*******\n";
+  print decode_base64($response->{'xml'});
+  print "******\n";
+
+  print "*******\n";
+  print decode_base64($response->{'txt'});
+  print "******\n";
+
+  print "**Guardar PNG**\n";
+  my $out;
+  open($out, '>:raw', 'comprobantes/imagen.png') or die "Unable to open: $!";
+  print $out decode_base64($response->{'png'});
+  close($out);
+} else
+{
+   die "Oh crap\!";
+}
 #my $data = SOAP::Data->new($response)->dataof('//xml');
 # invoke the SOAP call
-print "**********\n";
-print Dumper($response);
-print "**********\n";
+print "Fin de ejecucion";
 
-print "*******\n";
-print decode_base64($response->{'xml'});
-print "******\n";
 
-print "*******\n";
-print decode_base64($response->{'txt'});
-print "******\n";
-
-print "**Guardar PNG**\n";
-my $out;
-open($out, '>:raw', 'comprobantes/imagen.png') or die "Unable to open: $!";
-print $out decode_base64($response->{'png'});
-close($out);
-
-print "Fin de ejecucion"
