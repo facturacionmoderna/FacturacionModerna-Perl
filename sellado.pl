@@ -11,30 +11,6 @@ use IO::All;
 use XML::LibXML;
 use XML::LibXSLT;
 
-# not necessary if we have /dev/random:
-#Crypt::OpenSSL::Random::random_seed($good_entropy);
-#Crypt::OpenSSL::RSA->import_random_seed();
-#$rsa_pub = Crypt::OpenSSL::RSA->new_public_key($key_string);
-#$rsa_pub->use_sslv23_padding(); # use_pkcs1_oaep_padding is the default
-#$ciphertext = $rsa->encrypt($plaintext);
-#
-#$rsa_priv = Crypt::OpenSSL::RSA->new_private_key($key_string);
-#$plaintext = $rsa->encrypt($ciphertext);
-#
-#$rsa = Crypt::OpenSSL::RSA->generate_key(1024); # or
-#$rsa = Crypt::OpenSSL::RSA->generate_key(1024, $prime);
-#
-#print "private key is:\n", $rsa->get_private_key_string();
-#print "public key (in PKCS1 format) is:\n",
-#$rsa->get_public_key_string();
-#print "public key (in X509 format) is:\n",
-#$rsa->get_public_key_x509_string();
-
-#$rsa_priv->use_md5_hash(); # use_sha1_hash is the default
-#$signature = $rsa_priv->sign($plaintext);
-#print "Signed correctly\n" if ($rsa->verify($plaintext, $signature));
-
-
 # Generar CFDI
 my $now = time();
 $fecha_actual = strftime("%Y-%m-%dT%H:%M:%S", localtime($now));
@@ -93,12 +69,6 @@ $sello = encode_base64($sig);
 $sello =~ s/\n//g;
 $sello =~ s/\r//g;
 print "$sello";
-
-#$c = $xdoc->getElementsByTagNameNS('http://www.sat.gob.mx/cfd/3', 'Comprobante')->item(0);
-#$c->setAttribute('sello', $sello);
-#$c->setAttribute('certificado', $certificado);
-#$c->setAttribute('noCertificado', $numero_certificado);
-#return $xdoc->saveXML();
 
 @c = $xdoc->getElementsByTagNameNS('http://www.sat.gob.mx/cfd/3', 'Comprobante');
 $node = @c[0];

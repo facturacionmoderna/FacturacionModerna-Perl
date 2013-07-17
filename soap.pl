@@ -2,10 +2,10 @@
 
 # declare usage of SOAP::Lite
 use SOAP::Lite;#( +trace => 'all', maptype => {} );
-use POSIX qw(strftime);
-use MIME::Base64;
+use POSIX qw(strftime);use MIME::Base64;
 use Data::Dumper;
 use Class::Struct;
+use XML::LibXML;
 
 # Generar CFDI
 my $now = time();
@@ -131,7 +131,7 @@ tasa|16.00
 LAYOUT
 
 
-$encoded = encode_base64($xml);
+$encoded = encode_base64($cfdi);
 # declare the SOAP endpoint here
 my $soap = SOAP::Lite->service($url_timbrado);
 
@@ -166,8 +166,18 @@ unless ($error) {
   print "**********\n";
 
   print "*******\n";
-  print decode_base64($response->{'xml'});
-  print "******\n";
+  my $cfdi_xml = decode_base64($response->{'xml'});
+  my $parser = XML::LibXML->new();
+  my $xdoc   = $parser->parse_string($cfdi_xml);
+
+  #$xdoc->registerXPathNamespace("tfd", "http://www.sat.gob.mx/TimbreFiscalDigital");
+  my $xpc = XML::LibXML::XPathContext->new($xdoc);
+  $xpc->registerNs("tfd", "http://www.sat.gob.mx/TimbreFiscalDigital");
+  my @tfd = $xpc->findnodes('//tfd:TimbreFiscalDigital');
+
+  my $uuid = @tfd[0]->getAttribute('UUID');
+  print "$cfdi_xml\n******\n";
+  print "$uuid\n******\n";
 
   print "*******\n";
   print decode_base64($response->{'txt'});
@@ -180,7 +190,7 @@ unless ($error) {
   close($out);
 } else
 {
-   die "Oh crap\!";
+   die "@_ Oh crap\!";
 }
 #my $data = SOAP::Data->new($response)->dataof('//xml');
 # invoke the SOAP call
