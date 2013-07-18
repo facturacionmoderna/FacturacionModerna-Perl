@@ -1,11 +1,14 @@
 #!/usr/bin/perl -w
 
 # declare usage of SOAP::Lite
+use Module::Load;
 use SOAP::Lite;#( +trace => 'all', maptype => {} );
 use POSIX qw(strftime);use MIME::Base64;
 use Data::Dumper;
 use Class::Struct;
 use XML::LibXML;
+
+load 'SelladoCFDI.pl';
 
 # Generar CFDI
 my $now = time();

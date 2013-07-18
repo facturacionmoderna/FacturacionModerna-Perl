@@ -1,8 +1,6 @@
 #!/usr/bin/perl -w
 
-
 use MIME::Base64;
-
 
 use POSIX qw(strftime);
 use Crypt::OpenSSL::Random;
@@ -10,6 +8,12 @@ use Crypt::OpenSSL::RSA;
 use IO::All;
 use XML::LibXML;
 use XML::LibXSLT;
+
+
+sub SellarCFDI {
+ my ($cfdi, $numero_certificado, $archivo_cer, $archivo_pem) = @_;
+
+}
 
 # Generar CFDI
 my $now = time();
