@@ -24,7 +24,7 @@ $service->emisorRFC($rfc);
 $service->UserID('UsuarioPruebasWS');
 $service->UserPass("b9ec2afa3361a59af4b4d102d3f704eabdf097d4");
 my %opciones = ( 'generarCBB' => 'false', 'generarTXT' => 'true', 'generarPDF' => 'true' );
-$service->timbrarCFDI($layout, \%opciones );
+$service->timbrar($layout, \%opciones );
 # Timbrado finalizado
 
 print "\nTimbrado terminado, UUID:".$service->uuid. "\n";

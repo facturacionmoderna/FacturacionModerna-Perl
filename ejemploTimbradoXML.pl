@@ -1,11 +1,8 @@
 #!/usr/bin/perl -w
 
 use Module::Load;
-use SOAP::Lite;#( +trace => 'all', maptype => {} );
 use POSIX qw(strftime);use MIME::Base64;
-use Data::Dumper;
 use Class::Struct;
-use XML::LibXML;
 
 
 load 'FacturacionModerna/manipularXML.pl';
@@ -28,7 +25,7 @@ $service->emisorRFC($rfc);
 $service->UserID('UsuarioPruebasWS');
 $service->UserPass("b9ec2afa3361a59af4b4d102d3f704eabdf097d4");
 my %opciones = ( 'generarCBB' => 'false', 'generarTXT' => 'true', 'generarPDF' => 'true' );
-$service->timbrarCFDI($xml_sellado, \%opciones );
+$service->timbrar($xml_sellado, \%opciones );
 # Timbrado finalizado
 
 

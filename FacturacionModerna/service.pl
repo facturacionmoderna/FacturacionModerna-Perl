@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use Module::Load;
-use SOAP::Lite;#( +trace => 'all', maptype => {} );
+use SOAP::Lite( +trace => 'all', maptype => {} );
 use POSIX qw(strftime);use MIME::Base64;
 use Data::Dumper;
 use Class::Struct;
@@ -90,14 +90,14 @@ sub generarParametros {
   $params->{'emisorRFC'} = $self->emisorRFC;
   $params->{'UserID'} = $self->UserID;
   $params->{'UserPass'} = $self->UserPass;
-  $params->{'generarCBB'} = $self->generarCBB;
-  $params->{'generarTXT'} = $self->{_generar_txt};
-  $params->{'generarPDF'} = $self->{_generar_pdf};
+  #$params->{'generarCBB'} = $self->generarCBB;
+  #$params->{'generarTXT'} = $self->generarTXT;
+  #$params->{'generarPDF'} = $self->generarPDF;
   my %parametros = (%$params, %$opciones);
   return \%parametros;
 }
 
-sub timbrarCFDI(){
+sub timbrar(){
   my ( $self, $cfdi, $opciones) = @_;
   my $parametros = $self->generarParametros($opciones);
   my $encoded = encode_base64($cfdi);
@@ -136,7 +136,18 @@ sub timbrarCFDI(){
     print $out decode_base64($response->{'pdf'});
     close($out);
   }
-
 }
+
+sub cancelar(){
+  my ( $self, $uuid, $opciones) = @_;
+  my $parametros = $self->generarParametros($opciones);
+  my $soap = SOAP::Lite->service($self->url);
+
+  # Agregamos a los parámetros el contenido a timbrar
+  $parametros->{'uuid'} = $uuid;
+  our $response = $soap->requestCancelarCFDI($parametros);
+  print Dumper($response);
+}
+
 
 1;
