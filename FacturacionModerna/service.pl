@@ -1,66 +1,142 @@
 #!/usr/bin/perl -w
 package FacturacionModerna::Service;
+use warnings;
 use strict;
 
+use Module::Load;
+use SOAP::Lite;#( +trace => 'all', maptype => {} );
+use POSIX qw(strftime);use MIME::Base64;
+use Data::Dumper;
+use Class::Struct;
+use XML::LibXML;
+
 sub new(){
+  my ($class) = @_;
   my $self = {
-    _UserID => undef,
-    _UserPass => undef,
-  }
+    _url => undef,
+    _xml => undef,
+    _txt => undef,
+    _pdf => undef,
+    _png => undef,
+    _pdf => undef,
+    _uuid => undef,
+    _rfc_emisor => undef,
+    _user_id => undef,
+    _user_password => undef,
+    _generar_cbb => 'false',
+    _generar_txt => 'false',
+    _generar_pdf => 'false'
+  };
+  bless($self, $class);
+  return $self;
+}
+
+# Accesors
+sub url {
+  my ( $self, $url ) = @_;
+  $self->{_url} = $url if defined($url);
+  return $self->{_url};
+}
+
+sub xml {
+  my ( $self ) = @_;
+  return $self->{_xml};
+}
+
+sub uuid {
+  my ( $self ) = @_;
+  return $self->{_uuid};
+}
+
+sub emisorRFC {
+  my ( $self, $emisor_rfc) = @_;
+  $self->{_emisor_rfc} = $emisor_rfc if defined($emisor_rfc);
+  return $self->{_emisor_rfc};
+}
+
+sub UserID {
+  my ( $self, $user_id) = @_;
+  $self->{_user_id} = $user_id if defined($user_id);
+  return $self->{_user_id};
+}
+
+sub UserPass {
+  my ( $self, $user_password) = @_;
+  $self->{_user_password} = $user_password if defined($user_password);
+  return $self->{_user_password};
+}
+
+sub generarCBB {
+  my ( $self, $generar_cbb) = @_;
+  $self->{_generar_cbb} = $generar_cbb if defined($generar_cbb);
+  return $self->{_generar_cbb};
+}
+
+sub generarTXT {
+  my ( $self, $generar_txt) = @_;
+  $self->{_generar_txt} = $generar_txt if defined($generar_txt);
+  return $self->{_generar_txt};
+}
+
+sub generarPDF {
+  my ( $self, $generar_pdf) = @_;
+  $self->{_generar_pdf} = $generar_pdf if defined($generar_pdf);
+  return $self->{_generar_pdf};
+}
+
+sub generarParametros {
+  my ( $self, $opciones) = @_;
+  my $params = {};
+  $params->{'emisorRFC'} = $self->emisorRFC;
+  $params->{'UserID'} = $self->UserID;
+  $params->{'UserPass'} = $self->UserPass;
+  $params->{'generarCBB'} = $self->generarCBB;
+  $params->{'generarTXT'} = $self->{_generar_txt};
+  $params->{'generarPDF'} = $self->{_generar_pdf};
+  my %parametros = (%$params, %$opciones);
+  return \%parametros;
 }
 
 sub timbrarCFDI(){
-  $encoded = encode_base64($cfdi);
-  # declare the SOAP endpoint here
-  my $soap = SOAP::Lite->service($url_timbrado);
+  my ( $self, $cfdi, $opciones) = @_;
+  my $parametros = $self->generarParametros($opciones);
+  my $encoded = encode_base64($cfdi);
+  my $soap = SOAP::Lite->service($self->url);
 
-  my @params = { emisorRFC => $rfc,
-    UserID => $user_id,
-    UserPass => $user_password,
-    text2CFDI => $encoded,
-    generarCBB => 'true',
-    generarTXT => 'true',
-    generarPDF => 'false'};
+  # Agregamos a los parámetros el contenido a timbrar
+  $parametros->{'text2CFDI'} = $encoded;
+  our $response = $soap->requestTimbrarCFDI($parametros);
 
-  our $error = 0;
-  sub ErrorHappen {
-    $error = 1;
-  }
-  our $response;
-  eval {
-    $response = $soap->requestTimbrarCFDI(@params);
-  } || ErrorHappen;
+  # Obtener el XML
+  my $cfdi_xml = decode_base64($response->{'xml'});
+  my $parser = XML::LibXML->new();
+  my $xdoc   = $parser->parse_string($cfdi_xml);
 
-  unless ($error) {
-    print "**********\n";
-    print Dumper($response);
-    print "**********\n";
+  # Obtener el UUID del XML
+  my $xpc = XML::LibXML::XPathContext->new($xdoc);
+  $xpc->registerNs("tfd", "http://www.sat.gob.mx/TimbreFiscalDigital");
+  my @tfd = $xpc->findnodes('//tfd:TimbreFiscalDigital');
 
-    print "*******\n";
-    my $cfdi_xml = decode_base64($response->{'xml'});
-    my $parser = XML::LibXML->new();
-    my $xdoc   = $parser->parse_string($cfdi_xml);
+  my $uuid = @tfd[0]->getAttribute('UUID');
+  $self->{_xml} = $cfdi_xml;
+  $self->{_uuid} = $uuid;
 
-    my $xpc = XML::LibXML::XPathContext->new($xdoc);
-    $xpc->registerNs("tfd", "http://www.sat.gob.mx/TimbreFiscalDigital");
-    my @tfd = $xpc->findnodes('//tfd:TimbreFiscalDigital');
-
-    my $uuid = @tfd[0]->getAttribute('UUID');
-    print "$cfdi_xml\n******\n";
-    print "$uuid\n******\n";
-
-    print "*******\n";
-    print decode_base64($response->{'txt'});
-    print "******\n";
-
-    print "**Guardar PNG**\n";
+  $self->{_txt} = decode_base64($response->{'txt'}) if defined($response->{'txt'});
+  # Guardar el archivo CBB (png)
+  if ($response->{'png'}) {
     my $out;
-    open($out, '>:raw', 'comprobantes/imagen.png') or die "Unable to open: $!";
+    open($out, '>:raw', "comprobantes/$uuid.png") or die "Unable to open: $!";
     print $out decode_base64($response->{'png'});
     close($out);
-  } else
-  {
-     die "@_ Oh crap\!";
   }
-  print "Fin de ejecucion";
+  # Guardar el archivo PDF
+  if ($response->{'pdf'}) {
+    my $out;
+    open($out, '>:raw', "comprobantes/$uuid.pdf") or die "Unable to open: $!";
+    print $out decode_base64($response->{'pdf'});
+    close($out);
+  }
+
 }
+
+1;
