@@ -51,6 +51,48 @@ sub sellarCFDI {
   return $xdoc->toString;
 }
 
+sub sellarRetenciones {
+  my ($xml, $archivo_cer, $archivo_pem) = @_;
+  # Leer los archivos de certificados
+  my $key_string;
+  io($archivo_pem) > $key_string;
+  my $certificado;
+  io($archivo_cer) > $certificado;
+
+  # Codificación del certificado
+  $certificado = encode_base64($certificado);
+  $certificado =~ s/\n//g;
+  $certificado =~ s/\r//g;
+
+  # Generación de la cadena original con base a los XSLT
+  my $parser = XML::LibXML->new();
+  my $xslt = XML::LibXSLT->new();
+  my $xdoc    = $parser->parse_string($xml);
+  my $xsl    = $parser->parse_file('utilerias/retenciones_xslt/retenciones.xslt');
+
+  my @c = $xdoc->getElementsByTagNameNS('http://www.sat.gob.mx/esquemas/retencionpago/1', 'Retenciones');
+
+  $xslt = $xslt->parse_stylesheet($xsl);
+  my $result = $xslt->transform($xdoc);
+  my $html = $xslt->output_string($result);
+
+  print $html;
+
+  # Generación del sello con base a la llave privada
+  my $private = Crypt::OpenSSL::RSA->new_private_key($key_string);
+  my $sig = $private->sign($html);
+  my $sello = encode_base64($sig);
+  $sello =~ s/\n//g;
+  $sello =~ s/\r//g;
+
+  # Agregar Sello y Certificado
+  my $node = @c[0];
+  $node->setAttribute('Sello', $sello);
+  $node->setAttribute('Cert', $certificado);
+
+  return $xdoc->toString;
+}
+
 sub generarXML {
   my $rfc = $_[0];
   my $now = time();
@@ -72,6 +114,29 @@ sub generarXML {
   </cfdi:Traslados>
 </cfdi:Impuestos>
 </cfdi:Comprobante>
+XML
+  return $xml;
+}
+
+sub generarXMLRetenciones {
+  my $rfc = $_[0];
+  my $numCert = $_[1];
+  my $now = time();
+  my $fecha_actual = strftime("%Y-%m-%dT%H:%M:%S", localtime($now));
+
+  my $xml = <<XML;
+<?xml version="1.0" encoding="UTF-8"?>
+  <retenciones:Retenciones xmlns:retenciones="http://www.sat.gob.mx/esquemas/retencionpago/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/esquemas/retencionpago/1 http://www.sat.gob.mx/esquemas/retencionpago/1/retencionpagov1.xsd" Version="1.0" FolioInt="RetA" Sello="" NumCert="$numCert" Cert="" FechaExp="$fecha_actual-06:00" CveRetenc="05">
+      <retenciones:Emisor RFCEmisor="$rfc" NomDenRazSocE="Empresa retenedora ejemplo"/>
+      <retenciones:Receptor Nacionalidad="Nacional">
+          <retenciones:Nacional RFCRecep="XAXX010101000" NomDenRazSocR="Publico en General"/>
+      </retenciones:Receptor>
+      <retenciones:Periodo MesIni="12" MesFin="12" Ejerc="2014"/>
+      <retenciones:Totales montoTotOperacion="33783.75" montoTotGrav="35437.50" montoTotExent="0.00" montoTotRet="7323.75">
+          <retenciones:ImpRetenidos BaseRet="35437.50" Impuesto="02" montoRet="3780.00" TipoPagoRet="Pago definitivo"/>
+          <retenciones:ImpRetenidos BaseRet="35437.50" Impuesto="01" montoRet="3543.75" TipoPagoRet="Pago provisional"/>
+      </retenciones:Totales>
+  </retenciones:Retenciones>
 XML
   return $xml;
 }
